@@ -1,0 +1,178 @@
+<!-- Template file for displaying the product list -->
+<div class="product-list-container">
+    <!-- Form for submitting low price, high price, and sort values -->
+    <form id="product-list-form">
+        <!-- Low price input field -->
+        <div class="field">
+            <label for="low_price">Low Price:</label>
+            <input type="text" id="low_price" name="low_price" required />
+        </div>
+        <!-- High price input field -->
+        <div class="field">
+            <label for="high_price">High Price:</label>
+            <input type="text" id="high_price" name="high_price" required />
+        </div>
+        <!-- Sort select field -->
+        <div class="field">
+            <label for="sort">Sort:</label>
+            <select id="sort" name="sort">
+    
+    <option value="price_asc" selected>Price (Low to High)</option>
+    <option value="price_desc">Price (High to Low)</option>
+</select>
+        </div>
+        <!-- Submit button -->
+        <div class="actions">
+            <button type="submit">Submit</button>
+        </div>
+    </form>
+    <!-- Table for displaying the product data -->
+    <table id="product-list">
+        <thead>
+            <tr>
+                <th>Thumnail Image</th>
+                <th>Product SKU</th>
+                <th>Name</th>
+                <th>Price</th>
+                <th>QTY</th>
+                <th>Store URL</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+<!-- JavaScript for submitting the form via AJAX and populating the table with the product data -->
+<script type="text/javascript">
+    // Get the form element
+    const form = document.getElementById("product-list-form");
+
+    // Get the table element
+    const table = document.getElementById("product-list");
+
+    // Get the table body element
+    const tableBody = table.getElementsByTagName("tbody")[0];
+
+    // Get the low price input field
+    const lowPriceInput = document.getElementById("low_price");
+
+    // Get the high price input field
+    const highPriceInput = document.getElementById("high_price");
+
+    // Get the sort select field
+    const sortSelect = document.getElementById("sort");
+
+    // Create an array to store the product data
+    const productData = [
+    <?php
+        $productCollection = $block->getProductCollection();
+        $stockRegistry = \Magento\Framework\App\ObjectManager::getInstance()
+            ->get(\Magento\CatalogInventory\Api\StockRegistryInterface::class);
+        foreach ($productCollection as $product) {
+            $thumbnail = $product->getData('thumbnail');
+            $sku = $product->getData('sku');
+            $name = $product->getData('name');
+            $price = $product->getData('price');
+            $stockItem = $stockRegistry->getStockItem($product->getId());
+            $qty = $stockItem->getQty();
+            $url = $product->getData('url_key');
+            echo "{ thumbnail: '$thumbnail', sku: '$sku', name: '$name', price: '$price', qty: '$qty', url: '$url'},";
+        }
+    ?>
+];
+
+    // Function to filter the product data based on the low price and high price values
+    function filterProducts(lowPrice, highPrice) {
+        return productData.filter(product => {
+            return product.price >= lowPrice && product.price <= highPrice;
+        });
+    }
+
+    // Function to sort the product data based on the sort value
+    function sortProducts(sortValue, products) {
+        switch (sortValue) {
+            case "price_asc":
+                return products.sort((a, b) => a.price - b.price);
+            case "price_desc":
+                return products.sort((a, b) => b.price - a.price);
+            default:
+                return products;
+        }
+    }
+
+    // Function to display the product data in the table
+    function displayProducts(products) {
+        // Clear the table body
+        tableBody.innerHTML = "";
+
+        // Loop through the products and add a row for each product
+        products.forEach(product => {
+            const row = tableBody.insertRow();
+            const thumbCell = row.insertCell();
+            const skuCell = row.insertCell();
+            const nameCell = row.insertCell();
+            const priceCell = row.insertCell();
+            const qtyCell = row.insertCell();
+            const urlCell = row.insertCell();
+            if (product.thumbnail) {
+            thumbCell.innerHTML = "<img width='50' height='50' src=/pub/media/catalog/product/" + product.thumbnail + ">";
+        } else {
+            thumbCell.innerHTML = "No image";
+        }
+            skuCell.innerHTML = product.sku;
+            nameCell.innerHTML = product.name;
+           // priceCell.innerHTML = product.price;
+            //priceCell.innerHTML = "$" + product.price;
+            priceCell.innerHTML = "$" + parseFloat(product.price).toFixed(2);
+            qtyCell.innerHTML = product.qty;
+            urlCell.innerHTML = "<a target='_blank' href='/" + product.url + ".html'>Buy Now!</a>";
+        });
+    }
+
+    // Submit form event handler
+form.addEventListener("submit", e => {
+    e.preventDefault();
+
+    // Get the low price and high price values
+    const lowPrice = parseFloat(lowPriceInput.value);
+    const highPrice = parseFloat(highPriceInput.value);
+
+    // Validate the low price and high price values
+    if (!Number.isFinite(lowPrice) || !Number.isFinite(highPrice)) {
+        alert("Please enter valid numeric values for low and high price.");
+        lowPriceInput.focus();
+        return;
+    }
+    if (isNaN(lowPrice) || lowPrice <= 0) {
+        alert("Please enter a valid low price value.");
+        lowPriceInput.focus();
+        return;
+    }
+    if (isNaN(highPrice) || highPrice <= 0) {
+        alert("Please enter a valid high price value.");
+        highPriceInput.focus();
+        return;
+    }
+    if (lowPrice >= highPrice) {
+        alert("Low price must be less than high price.");
+        lowPriceInput.focus();
+        return;
+    }//High Range no more than 5x higher than the entered Low Range
+    if (highPrice > lowPrice *5) {
+        alert("High Price must not be great then 5x the Low Price");
+        highPriceInput.focus();
+        return;
+    }
+
+    // Get the sort value
+    const sortValue = sortSelect.value;
+
+    // Filter the product data
+    let filteredProducts = filterProducts(lowPrice, highPrice);
+
+    // Sort the filtered products
+    filteredProducts = sortProducts(sortValue, filteredProducts);
+
+    // Display the filtered and sorted products
+    displayProducts(filteredProducts);
+});
+</script>
