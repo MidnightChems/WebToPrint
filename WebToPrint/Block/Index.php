@@ -2,39 +2,74 @@
 
 namespace GuyOrazem\WebToPrint\Block;
 
+use Magento\Framework\View\Element\Template;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory;
 
 class Index extends \Magento\Framework\View\Element\Template
 {
     protected $_productCollectionFactory;
+    protected $lowPrice;
+    protected $highPrice;
 
     public function __construct(
-        \Magento\Backend\Block\Template\Context $context,
-        \Magento\Catalog\Model\ResourceModel\Product\CollectionFactory $productCollectionFactory,
+        Template\Context $context,
+        CollectionFactory $productCollectionFactory,
         array $data = []
     ) {
-        $this->_productCollectionFactory = $productCollectionFactory;
         parent::__construct($context, $data);
+        $this->_productCollectionFactory = $productCollectionFactory;
+        
     }
 
-    /*I wanted the values of the 'addAttributeToFilter' to be user supplied but it was not working as I could not figure out how to get the values from the form on phtml to this block file
-    
-    function to created the production collection factory, something like 
-    $productCollection = $block->getProductCollection(); will allow you to use it in the phtml file
-    
-    Collection was limited to 10 on the form, but this was done on the phtml
-    via JS as I couldn't get the values to pass over from the phtml file like I wanted
-    
-    
-    */
     public function getProductCollection()
     {
+        //gets params from the URL
+        $this->getRequest()->getParams();
+        $lowPrice = $this->getRequest()->getParam('low_price');
+        $highPrice = $this->getRequest()->getParam('high_price');
+        $sortOrder = $this->getRequest()->getParam('sort');
         
+        if ($lowPrice !== null && $highPrice !== null) {
+        // Check if the input values are numeric
+        if (!is_numeric($lowPrice) || !is_numeric($highPrice)) {
+            // Handle the error, for example:
+            throw new \Exception('Low and high prices must be numeric.');
+        }
+
+        // Check if lowPrice is less than highPrice
+        if ($lowPrice >= $highPrice) {
+            // Handle the error
+            throw new \Exception('Low price must be lower than high price.');
+        }
+        
+        //Checks if High price is more than 10x the low price
+        if ($lowPrice * 10 < $highPrice ) {
+            // Handle the error
+            throw new \Exception('High price must not be more than 10x higher than Low price.');
+        }
+    }
+        //create the collection factory and add attributes
         $collection = $this->_productCollectionFactory->create();
         $collection->addAttributeToSelect(['sku', 'name', 'price', 'url_key', 'thumbnail']);
-        // $collection->addAttributeToFilter('price', array('gteq' =>  User supplied lowPrice));
-        // $collection ->addAttributeToFilter('price', array('lteq' => User supplied highPrice));
-        //$collection->setPageSize(10);
+        
+        //if value is not null assign values from form. If null sets min and max price to 0 and 1 by default
+        if ($lowPrice !== null && $highPrice !== null) {
+            $collection->addAttributeToFilter('price', array('gteq' => $lowPrice));
+            $collection->addAttributeToFilter('price', array('lteq' => $highPrice));
+            
+        } else {
+            $collection->addAttributeToFilter('price', array('gteq' => 0));
+            $collection->addAttributeToFilter('price', array('lteq' => 1));
+        }
+        
+        if ($sortOrder == "price_desc") {
+            $collection->addAttributeToSort('price', 'DESC');
+        } else {
+            $collection->addAttributeToSort('price', 'ASC');
+        }
+        
+       
+        $collection->setPageSize(10);
         return $collection;
     }
 }
